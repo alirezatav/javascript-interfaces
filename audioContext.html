@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+  </head>
+  <body>
+    <h1>Use your keyboard as a synth</h1>
+    <button onclick="init()" id="button">Turn synth on</button>
+    <button onclick="startLfo()" id="lfo">Turn LFO on</button>
+
+    <script>
+      let keysPress = [];
+      let started = false;
+      let playing = false;
+      let osc, lfo, amp;
+      let ampNode;
+      function init() {
+        let audioCtx = new AudioContext();
+        osc = new OscillatorNode(audioCtx, {
+          type: "sine",
+          frequency: 200,
+        });
+        amp = new GainNode(audioCtx, {
+          value: 1,
+        });
+
+        lfo = new OscillatorNode(audioCtx, {
+          type: "sine",
+          frequency: 2,
+        });
+        lfo.connect(amp.gain); //change gain of amp by lfo oscilates.
+
+        ampNode = osc.connect(amp);
+        osc.start(0);
+
+        window.onkeydown = (e) => {
+          if (keysPress.indexOf(e.keyCode) === -1) keysPress.push(e.keyCode);
+          let number = e.keyCode;
+          osc.frequency.setValueAtTime(number * 9, audioCtx.currentTime);
+          ampNode.connect(audioCtx.destination);
+        };
+        window.onkeyup = (e) => {
+          let ci = keysPress.indexOf(e.keyCode);
+          keysPress.splice(ci, 1);
+          let number = keysPress[keysPress.length - 1];
+          if (number !== undefined)
+            osc.frequency.setValueAtTime(number * 9, audioCtx.currentTime);
+          if (!keysPress.length) ampNode.disconnect();
+        };
+      }
+      function startLfo() {
+        if (!started) lfo.start();
+        started = true;
+      }
+    </script>
+  </body>
+</html>
