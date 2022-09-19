@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
   </head>
   <body>
-    <h1>Use your keyboard as a synth</h1>
+    <h1>Use your keyboard as a synth + record it</h1>
     <button onclick="init()" id="button">Turn synth on</button>
     <button onclick="startLfo()" id="lfo">Turn LFO on</button>
 
@@ -12,17 +12,22 @@
       let keysPress = [];
       let started = false;
       let playing = false;
-      let osc, lfo, amp;
+      let osc, lfo, amp, delay;
       let ampNode;
+
       function init() {
         let audioCtx = new AudioContext();
         osc = new OscillatorNode(audioCtx, {
           type: "sine",
           frequency: 200,
         });
+
+        //alternatively we could use audioCtx.createGain().
         amp = new GainNode(audioCtx, {
           value: 1,
         });
+
+        // delay = new DelayNode(audioCtx, { delayTime: 2, maxDelayTime: 5 });
 
         lfo = new OscillatorNode(audioCtx, {
           type: "sine",
@@ -30,8 +35,19 @@
         });
         lfo.connect(amp.gain); //change gain of amp by lfo oscilates.
 
+        // let delayed = osc.connect(delay);
+
         ampNode = osc.connect(amp);
         osc.start(0);
+
+        // set curve change for gain parameter of amp
+        // amp.gain.setValueCurveAtTime([3, 2, 1, 0.5, 0.1, 0], audioCtx.currentTime, 5);
+
+        let rec = record(audioCtx, ampNode);
+        rec.mediaRecorder.start();
+        setTimeout(() => {
+          rec.mediaRecorder.stop();
+        }, 5000);
 
         window.onkeydown = (e) => {
           if (keysPress.indexOf(e.keyCode) === -1) keysPress.push(e.keyCode);
@@ -39,18 +55,36 @@
           osc.frequency.setValueAtTime(number * 9, audioCtx.currentTime);
           ampNode.connect(audioCtx.destination);
         };
+
         window.onkeyup = (e) => {
           let ci = keysPress.indexOf(e.keyCode);
           keysPress.splice(ci, 1);
           let number = keysPress[keysPress.length - 1];
           if (number !== undefined)
             osc.frequency.setValueAtTime(number * 9, audioCtx.currentTime);
-          if (!keysPress.length) ampNode.disconnect();
+          if (!keysPress.length) ampNode.disconnect(audioCtx.destination);
         };
       }
       function startLfo() {
         if (!started) lfo.start();
         started = true;
+      }
+
+      function record(audioContext, audioNode) {
+        let chunks = [];
+        let dest = new MediaStreamAudioDestinationNode(audioContext);
+        let mediaRecorder = new MediaRecorder(dest.stream);
+        audioNode.connect(dest);
+
+        mediaRecorder.ondataavailable = (evt) => {
+          chunks.push(evt.data);
+        };
+
+        mediaRecorder.onstop = () => {
+          const blob = new Blob(chunks, { type: "audio/ogg; codecs=opus" });
+          window.open(URL.createObjectURL(blob));
+        };
+        return { mediaRecorder };
       }
     </script>
   </body>
